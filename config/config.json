@@ -1,0 +1,6 @@
+{
+  "base_url": "https://books.toscrape.com/catalogue/page-1.html",
+  "output_excel": "output/products.xlsx",
+  "output_csv": "output/products.csv",
+  "log_file": "logs/scraper.log"
+}
