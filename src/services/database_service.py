@@ -1,119 +1,173 @@
-import sqlite3
+from sqlalchemy.orm import Session
 
-from pathlib import Path
+from src.database.database import (
+    engine,
+    SessionLocal,
+    Base
+)
 
-from core.config import DATABASE_PATH
+from src.models.product_model import ProductDB
 
+from src.models.product_price_model import (
+    ProductPriceDB
+)
+
+
+# ======================================
+# INITIALIZE DATABASE
+# ======================================
 
 def initialize_database(logger):
 
     """
-    Create SQLite database and products table.
-
-    Args:
-        logger:
-            Application logger instance.
+    Create database tables and return session.
     """
 
     logger.info(
-        "Initializing SQLite database"
+        "Initializing PostgreSQL database"
     )
 
-    # ======================================
-    # ENSURE DATABASE FOLDER EXISTS
-    # ======================================
-
-    db_path = Path(DATABASE_PATH)
-
-    db_path.parent.mkdir(
-        parents=True,
-        exist_ok=True
+    # Create all ORM tables
+    Base.metadata.create_all(
+        bind=engine
     )
-
-    # ======================================
-    # CONNECT TO DATABASE
-    # ======================================
-
-    connection = sqlite3.connect(
-        DATABASE_PATH
-    )
-
-    cursor = connection.cursor()
-
-    # ======================================
-    # CREATE PRODUCTS TABLE
-    # ======================================
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT,
-            price REAL,
-            rating TEXT,
-            availability TEXT
-        )
-        """
-    )
-
-    connection.commit()
 
     logger.info(
-        "Database initialized successfully"
+        "Database tables created successfully"
     )
 
-    return connection
+    # Create session
+    session = SessionLocal()
 
+    logger.info(
+        "Database session initialized"
+    )
+
+    return session
+
+
+# ======================================
+# SAVE PRODUCTS
+# ======================================
 
 def save_products_to_database(
-    connection,
+    session: Session,
     products,
     logger
 ):
 
     """
-    Save scraped products into SQLite database.
-
-    Args:
-        connection:
-            SQLite connection object.
-
-        products:
-            List of Product objects.
-
-        logger:
-            Application logger instance.
+    Save products and price history
+    into PostgreSQL database.
     """
 
     logger.info(
         f"Saving {len(products)} products "
-        f"to database"
+        f"to PostgreSQL database"
     )
 
-    cursor = connection.cursor()
+    try:
 
-    for product in products:
+        for scraped_product in products:
 
-        cursor.execute(
-            """
-            INSERT INTO products (
-                title,
-                price,
-                rating,
-                availability
+            # ======================================
+            # CHECK IF PRODUCT EXISTS
+            # ======================================
+
+            existing_product = (
+                session.query(ProductDB)
+                .filter(
+                    ProductDB.title
+                    == scraped_product.title
+                )
+                .first()
             )
-            VALUES (?, ?, ?, ?)
-            """,
-            (
-                product.title,
-                product.price,
-                product.rating,
-                product.availability
+
+            # ======================================
+            # CREATE NEW PRODUCT
+            # ======================================
+
+            if existing_product is None:
+
+                new_product = ProductDB(
+
+                    title=scraped_product.title,
+
+                    rating=scraped_product.rating,
+
+                    availability=(
+                        scraped_product.availability
+                    )
+                )
+
+                session.add(new_product)
+
+                # Flush generates ID immediately
+                session.flush()
+
+                product_db = new_product
+
+                logger.info(
+                    f"Created product: "
+                    f"{new_product.title}"
+                )
+
+            # ======================================
+            # UPDATE EXISTING PRODUCT
+            # ======================================
+
+            else:
+
+                existing_product.rating = (
+                    scraped_product.rating
+                )
+
+                existing_product.availability = (
+                    scraped_product.availability
+                )
+
+                product_db = existing_product
+
+                logger.info(
+                    f"Updated product: "
+                    f"{existing_product.title}"
+                )
+
+            # ======================================
+            # CREATE PRICE HISTORY SNAPSHOT
+            # ======================================
+
+            price_snapshot = ProductPriceDB(
+
+                product_id=product_db.id,
+
+                price=scraped_product.price
             )
+
+            session.add(price_snapshot)
+
+        # ======================================
+        # COMMIT TRANSACTION
+        # ======================================
+
+        session.commit()
+
+        logger.info(
+            "Products and price history "
+            "saved successfully"
         )
 
-    connection.commit()
+    except Exception as error:
 
-    logger.info(
-        "Products saved successfully"
-    )
+        session.rollback()
+
+        logger.exception(
+            f"Failed to save products: "
+            f"{error}"
+        )
+
+        raise
+
+    finally:
+
+        session.close()

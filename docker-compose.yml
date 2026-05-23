@@ -1,16 +1,50 @@
+
 services:
 
-  scraper-dashboard:
+  postgres:
+
+    image: postgres:16
+
+    container_name: ecommerce_postgres
+
+    restart: always
+
+    environment:
+
+      POSTGRES_USER: admin
+
+      POSTGRES_PASSWORD: admin
+
+      POSTGRES_DB: ecommerce_scraper
+
+    ports:
+
+      - "5432:5432"
+
+    volumes:
+
+      - postgres_data:/var/lib/postgresql/data
+
+
+  streamlit:
 
     build: .
 
-    container_name: ecommerce-dashboard
+    container_name: ecommerce_dashboard
+
+    restart: always
+
+    depends_on:
+
+      - postgres
 
     ports:
+
       - "8501:8501"
 
-    volumes:
-      - ./data:/app/data
-      - ./output:/app/output
+    command: streamlit run streamlit_app.py
 
-    restart: unless-stopped
+
+volumes:
+
+  postgres_data:

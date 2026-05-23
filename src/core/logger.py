@@ -1,6 +1,6 @@
 import logging
 
-from core.config import LOG_DIR
+from src.core.config import LOG_DIR
 
 LOG_DIR.mkdir(exist_ok=True)
 

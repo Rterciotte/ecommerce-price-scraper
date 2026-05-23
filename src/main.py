@@ -24,22 +24,19 @@ from openpyxl import load_workbook
 
 from core.cli import parse_arguments
 from core.logger import setup_logger
-from core.config import (
-    OUTPUT_EXCEL,
-    OUTPUT_CSV
-)
 
-from services.scraper_service import scrape_products
 from services.export_service import export_data
 from services.formatting_service import format_excel
-from services.dashboard_service import create_dashboard
-from services.chart_service import create_charts
 from services.cleaning_service import clean_products_dataframe
+
 from services.database_service import (
     initialize_database,
     save_products_to_database
 )
 
+from services.scraper_factory_service import (
+    scrape_products
+)
 
 # ======================================
 # CONFIGURATION FILE
@@ -47,6 +44,10 @@ from services.database_service import (
 
 CONFIG_PATH = "config/config.json"
 
+
+# ======================================
+# LOAD CONFIGURATION
+# ======================================
 
 def load_config():
 
@@ -59,8 +60,13 @@ def load_config():
     """
 
     with open(CONFIG_PATH, "r") as file:
+
         return json.load(file)
 
+
+# ======================================
+# MAIN APPLICATION
+# ======================================
 
 def main():
 
@@ -84,7 +90,7 @@ def main():
         # INITIALIZE DATABASE
         # ======================================
 
-        connection = initialize_database(
+        session = initialize_database(
             logger
         )
 
@@ -94,7 +100,10 @@ def main():
 
         config = load_config()
 
-        # Default output paths
+        # ======================================
+        # OUTPUT FILES
+        # ======================================
+
         output_excel = config["output_excel"]
 
         output_csv = config["output_csv"]
@@ -107,8 +116,12 @@ def main():
 
         pages = args.pages
 
-        # Override output path if provided
+        # ======================================
+        # OVERRIDE OUTPUT FILE
+        # ======================================
+
         if args.output:
+
             output_excel = args.output
 
         logger.info(
@@ -116,12 +129,17 @@ def main():
         )
 
         # ======================================
-        # EXECUTE SCRAPING PROCESS
+        # EXECUTE SCRAPING
         # ======================================
 
         products = scrape_products(
+            strategy="requests",
             pages=pages,
             logger=logger
+        )
+
+        logger.info(
+            f"Scraped {len(products)} products"
         )
 
         # ======================================
@@ -145,17 +163,17 @@ def main():
         )
 
         # ======================================
-        # SAVE CLEANED DATA TO SQLITE
+        # SAVE PRODUCTS TO POSTGRESQL
         # ======================================
 
         save_products_to_database(
-            connection=connection,
+            session=session,
             products=products,
             logger=logger
         )
 
         # ======================================
-        # RE-EXPORT CLEANED DATA
+        # EXPORT CLEANED DATA
         # ======================================
 
         df.to_excel(
@@ -164,7 +182,7 @@ def main():
         )
 
         # ======================================
-        # APPLY EXCEL FORMATTING
+        # FORMAT EXCEL FILE
         # ======================================
 
         format_excel(
@@ -181,25 +199,6 @@ def main():
         )
 
         # ======================================
-        # CREATE DASHBOARD
-        # ======================================
-
-        create_dashboard(
-            workbook=workbook,
-            df=df,
-            logger=logger
-        )
-
-        # ======================================
-        # CREATE CHARTS
-        # ======================================
-
-        create_charts(
-            workbook=workbook,
-            df=df
-        )
-
-        # ======================================
         # SAVE FINAL WORKBOOK
         # ======================================
 
@@ -207,20 +206,21 @@ def main():
             output_excel
         )
 
-        # ======================================
-        # CLOSE DATABASE CONNECTION
-        # ======================================
-
-        connection.close()
-
         logger.info(
             "Automation finished successfully"
         )
 
     except Exception as error:
 
-        logger.exception(error)
+        logger.exception(
+            f"Application failed: {error}"
+        )
 
+
+# ======================================
+# ENTRY POINT
+# ======================================
 
 if __name__ == "__main__":
+
     main()

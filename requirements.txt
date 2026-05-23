@@ -6,3 +6,7 @@ lxml
 streamlit
 plotly
 pytest
+playwright
+sqlalchemy
+psycopg[binary]
+python-dotenv
