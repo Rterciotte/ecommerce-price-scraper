@@ -10,7 +10,7 @@ from concurrent.futures import (
     as_completed
 )
 
-from models.product import Product
+from src.models.product import Product
 
 
 # ======================================

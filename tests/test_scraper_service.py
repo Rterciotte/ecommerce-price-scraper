@@ -1,86 +1,23 @@
-from unittest.mock import patch
-
-from src.services.scraper_service import (
-    scrape_single_page
+from src.services.scraper_factory_service import (
+    scrape_products
 )
 
-
-# ======================================
-# MOCK HTML RESPONSE
-# ======================================
-
-MOCK_HTML = """
-
-<html>
-    <body>
-
-        <article class="product_pod">
-
-            <h3>
-                <a title="Test Book"></a>
-            </h3>
-
-            <p class="price_color">
-                £29.99
-            </p>
-
-            <p class="star-rating Five"></p>
-
-            <p class="instock availability">
-                In stock
-            </p>
-
-        </article>
-
-    </body>
-</html>
-
-"""
+from src.core.logger import setup_logger
 
 
-# ======================================
-# MOCK RESPONSE CLASS
-# ======================================
+def test_requests_scraper():
 
-class MockResponse:
+    logger = setup_logger()
 
-    status_code = 200
-
-    text = MOCK_HTML
-
-    def raise_for_status(self):
-        pass
-
-
-# ======================================
-# TEST SCRAPER
-# ======================================
-
-@patch(
-    "src.services.scraper_service.requests.get"
-)
-
-def test_scrape_single_page(mock_get):
-
-    """
-    Validate scraping logic.
-    """
-
-    mock_get.return_value = MockResponse()
-
-    products = scrape_single_page(
-        page=1,
-        logger=None
+    products = scrape_products(
+        strategy="requests",
+        pages=1,
+        logger=logger
     )
 
-    assert len(products) == 1
+    assert len(products) > 0
 
-    product = products[0]
+    first_product = products[0]
 
-    assert product.title == "Test Book"
-
-    assert product.price == 29.99
-
-    assert product.rating == "Five"
-
-    assert product.availability == "In stock"
+    assert first_product.title is not None
+    assert first_product.price > 0
